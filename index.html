@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Diario Lavoro</title>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a24;
+    --surface2: #222230;
+    --border: #2e2e42;
+    --accent: #7c6af7;
+    --accent-soft: #7c6af720;
+    --accent2: #f7a26a;
+    --text: #e8e8f0;
+    --text-muted: #8888aa;
+    --text-dim: #55556a;
+    --green: #4ecb8d;
+    --red: #f76a6a;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── LOGIN SCREEN ─────────────────────────────────────── */
+  #loginScreen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 40px 24px; text-align: center;
+  }
+  .login-logo { font-size: 48px; margin-bottom: 16px; }
+  .login-title { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+  .login-title span { color: var(--accent); }
+  .login-sub { color: var(--text-muted); font-size: 15px; margin-bottom: 40px; line-height: 1.5; }
+  .btn-google {
+    display: flex; align-items: center; gap: 12px; padding: 14px 28px;
+    background: #fff; color: #1a1a2e; border: none; border-radius: var(--radius);
+    font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .btn-google:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
+  .btn-google img { width: 22px; height: 22px; }
+  .login-note { margin-top: 24px; font-size: 12px; color: var(--text-dim); max-width: 280px; }
+
+  /* ── MAIN APP ─────────────────────────────────────────── */
+  #appScreen { display: none; padding-bottom: 90px; }
+
+  /* HEADER */
+  .header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 16px 20px; position: sticky; top: 0; z-index: 100;
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; }
+  .app-title { font-size: 18px; font-weight: 700; }
+  .app-title span { color: var(--accent); }
+  .user-area { display: flex; align-items: center; gap: 10px; }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #fff; overflow: hidden; flex-shrink: 0;
+  }
+  .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .btn-signout {
+    background: none; border: 1px solid var(--border); color: var(--text-muted);
+    border-radius: var(--radius-sm); padding: 5px 10px; font-size: 12px; cursor: pointer;
+  }
+  .btn-signout:hover { color: var(--red); border-color: var(--red); }
+  .date-display { margin-top: 6px; font-size: 12px; color: var(--text-muted); }
+  .date-display strong { color: var(--text); }
+
+  /* SYNC INDICATOR */
+  .sync-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--green);
+    display: inline-block; margin-right: 6px; transition: background 0.3s;
+  }
+  .sync-dot.syncing { background: var(--accent2); animation: pulse 1s infinite; }
+  .sync-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* NAV */
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; z-index: 100; padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    padding: 12px 8px; gap: 4px; cursor: pointer; color: var(--text-dim);
+    font-size: 11px; transition: color 0.2s; border: none; background: none;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-icon { font-size: 20px; line-height: 1; }
+
+  /* PAGES */
+  .page { display: none; padding: 16px 20px; max-width: 680px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* SECTION TITLES */
+  .section-title {
+    font-size: 12px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; margin-top: 20px;
+  }
+  .section-title:first-child { margin-top: 0; }
+
+  /* CARDS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
+
+  /* FORM */
+  label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 5px; font-weight: 500; }
+  input[type="text"], input[type="number"], textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--text); font-family: inherit;
+    font-size: 15px; padding: 9px 12px; outline: none; transition: border-color 0.2s; -webkit-appearance: none;
+  }
+  input[type="text"]:focus, input[type="number"]:focus, textarea:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 75px; line-height: 1.5; }
+  ::placeholder { color: var(--text-dim); }
+
+  /* ACTIVITY ROW */
+  .activity-list { display: flex; flex-direction: column; gap: 8px; }
+  .activity-row { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; }
+  .activity-row-inner { display: flex; gap: 8px; align-items: flex-start; }
+  .activity-fields { display: flex; flex-direction: column; gap: 7px; flex: 1; }
+  .activity-inline { display: flex; gap: 8px; align-items: center; }
+  .activity-inline input[type="number"] { width: 75px; flex-shrink: 0; }
+  .activity-inline input[type="text"] { flex: 1; }
+  .btn-remove { background: none; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; padding: 2px; line-height: 1; flex-shrink: 0; transition: color 0.2s; }
+  .btn-remove:hover { color: var(--red); }
+
+  /* OBJECTIVES */
+  .obj-list { display: flex; flex-direction: column; gap: 7px; }
+  .obj-row { display: flex; gap: 8px; align-items: center; }
+  .obj-row input { flex: 1; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius-sm); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #6a58e0; }
+  .btn-secondary { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-save { width: 100%; padding: 13px; font-size: 15px; margin-top: 6px; background: var(--accent); color: #fff; border-radius: var(--radius); }
+  .btn-save:hover { background: #6a58e0; }
+  .btn-save:disabled { background: var(--surface2); color: var(--text-dim); cursor: not-allowed; }
+  .btn-add { background: var(--accent-soft); border: 1px dashed var(--accent); color: var(--accent); width: 100%; padding: 9px; margin-top: 4px; border-radius: var(--radius-sm); }
+  .btn-add:hover { background: var(--accent); color: #fff; }
+
+  /* TOTAL ORE */
+  .ore-total { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+  .ore-total strong { color: var(--accent2); font-size: 15px; }
+
+  /* SAVED BANNER */
+  .saved-banner { background: var(--green)20; border: 1px solid var(--green)50; border-radius: var(--radius-sm); padding: 9px 14px; font-size: 13px; color: var(--green); display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+
+  /* HISTORY */
+  .history-empty { text-align: center; color: var(--text-dim); padding: 60px 20px; font-size: 15px; }
+  .history-empty .emoji { font-size: 48px; display: block; margin-bottom: 12px; }
+
+  .report-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.2s; }
+  .report-card:hover { border-color: var(--accent); }
+  .report-card.expanded { border-color: var(--accent); }
+  .report-card-header { display: flex; align-items: center; justify-content: space-between; }
+  .report-date { font-weight: 700; font-size: 14px; }
+  .report-meta { display: flex; gap: 8px; align-items: center; margin-top: 5px; flex-wrap: wrap; }
+  .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; font-size: 11px; color: var(--text-muted); }
+  .badge.hours { color: var(--accent2); border-color: var(--accent2)40; background: var(--accent2)15; }
+  .badge.tasks { color: var(--green); border-color: var(--green)40; background: var(--green)15; }
+
+  .report-body { display: none; margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .report-card.expanded .report-body { display: block; }
+  .report-section { margin-bottom: 12px; }
+  .report-section:last-child { margin-bottom: 0; }
+  .report-section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-dim); margin-bottom: 7px; }
+
+  .activity-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 7px 10px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 5px; gap: 10px; }
+  .activity-item-main { flex: 1; }
+  .activity-item-client { font-size: 11px; color: var(--accent); font-weight: 600; margin-bottom: 2px; }
+  .activity-item-desc { font-size: 13px; }
+  .activity-item-hours { font-size: 12px; color: var(--accent2); font-weight: 600; white-space: nowrap; }
+  .note-text { font-size: 13px; line-height: 1.6; color: var(--text); background: var(--surface2); border-radius: var(--radius-sm); padding: 9px 12px; }
+  .obj-item { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .obj-item:last-child { border-bottom: none; }
+  .obj-bullet { color: var(--accent); }
+
+  .chevron { font-size: 11px; color: var(--text-dim); transition: transform 0.2s; }
+  .report-card.expanded .chevron { transform: rotate(180deg); }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; text-align: center; }
+  .stat-value { font-size: 26px; font-weight: 800; color: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+  .week-bar-list { display: flex; flex-direction: column; gap: 10px; }
+  .week-bar-row { display: flex; align-items: center; gap: 10px; }
+  .week-bar-label { font-size: 12px; color: var(--text-muted); width: 28px; text-align: right; }
+  .week-bar-track { flex: 1; background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; }
+  .week-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.4s; }
+  .week-bar-val { font-size: 12px; color: var(--text-muted); width: 30px; }
+
+  /* SEARCH */
+  .search-bar { position: relative; margin-bottom: 14px; }
+  .search-bar input { padding-left: 34px; }
+  .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 14px; }
+
+  /* LOADING */
+  .loading-spinner { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--text-dim); gap: 10px; font-size: 14px; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 11px 20px; font-size: 13px; opacity: 0; transition: all 0.3s; z-index: 999; white-space: nowrap; box-shadow: var(--shadow); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="login-logo">📓</div>
+  <div class="login-title">Diario<span>Lavoro</span></div>
+  <div class="login-sub">Il tuo diario di lavoro quotidiano.<br>Sincronizzato su tutti i tuoi dispositivi.</div>
+  <button class="btn-google" onclick="signInGoogle()">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+    Accedi con Google
+  </button>
+  <div class="login-note">I tuoi dati sono privati e accessibili solo dal tuo account Google.</div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appScreen">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-top">
+      <div class="app-title">Diario<span>Lavoro</span></div>
+      <div class="user-area">
+        <span><span class="sync-dot" id="syncDot"></span><span id="syncLabel" style="font-size:11px;color:var(--text-dim)">Sincronizzato</span></span>
+        <div class="user-avatar" id="userAvatar">V</div>
+        <button class="btn-signout" onclick="signOut()">Esci</button>
+      </div>
+    </div>
+    <div class="date-display" id="headerDate"></div>
+  </div>
+
+  <!-- PAGE: OGGI -->
+  <div class="page active" id="page-oggi">
+    <div id="todaySavedBanner" class="saved-banner" style="display:none">✓ Report di oggi già salvato — puoi modificarlo</div>
+    <div class="section-title">Attività svolte</div>
+    <div class="card">
+      <div class="activity-list" id="activityList"></div>
+      <button class="btn btn-add" onclick="addActivity()">+ Aggiungi attività</button>
+      <div class="ore-total">Totale: <strong id="totalOre">0h</strong></div>
+    </div>
+    <div class="section-title">Note e osservazioni</div>
+    <div class="card">
+      <textarea id="noteText" placeholder="Riflessioni, problemi, idee..." rows="4"></textarea>
+    </div>
+    <div class="section-title">Obiettivi per domani</div>
+    <div class="card">
+      <div class="obj-list" id="objList"></div>
+      <button class="btn btn-add" onclick="addObjective()">+ Aggiungi obiettivo</button>
+    </div>
+    <button class="btn btn-save" id="saveBtn" onclick="saveReport()">💾 Salva report del giorno</button>
+  </div>
+
+  <!-- PAGE: STORICO -->
+  <div class="page" id="page-storico">
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="Cerca cliente, attività, data..." oninput="renderHistory()">
+    </div>
+    <div id="historyContainer"></div>
+  </div>
+
+  <!-- PAGE: STATISTICHE -->
+  <div class="page" id="page-stats">
+    <div class="section-title">Riepilogo</div>
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="section-title">Ultimi 7 giorni</div>
+    <div class="card"><div class="week-bar-list" id="weekBars"></div></div>
+    <div class="section-title">Per cliente / progetto</div>
+    <div class="card" id="clientStats"></div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" onclick="showPage('oggi', this)">
+      <span class="nav-icon">✏️</span>Oggi
+    </button>
+    <button class="nav-item" onclick="showPage('storico', this)">
+      <span class="nav-icon">📋</span>Storico
+    </button>
+    <button class="nav-item" onclick="showPage('stats', this)">
+      <span class="nav-icon">📊</span>Statistiche
+    </button>
+  </nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── FIREBASE CONFIG ───────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyD9WHG4q2sRfCKnNSgoAvIK10K2R4LSwqc",
+  authDomain: "diario-lavoro.firebaseapp.com",
+  databaseURL: "https://diario-lavoro-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "diario-lavoro",
+  storageBucket: "diario-lavoro.firebasestorage.app",
+  messagingSenderId: "333835834539",
+  appId: "1:333835834539:web:079703230cb35a2d9093ee",
+  measurementId: "G-GQWZ35W2PD"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.database();
+
+// ── AUTH ──────────────────────────────────────────────────────
+let currentUser = null;
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    currentUser = user;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'block';
+    // Avatar
+    const av = document.getElementById('userAvatar');
+    if (user.photoURL) {
+      av.innerHTML = `<img src="${user.photoURL}" alt="">`;
+    } else {
+      av.textContent = (user.displayName || user.email || 'U')[0].toUpperCase();
+    }
+    updateHeaderDate();
+    loadToday();
+  } else {
+    currentUser = null;
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display = 'none';
+  }
+});
+
+function signInGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(err => {
+    showToast('⚠ Errore login: ' + err.message);
+  });
+}
+
+function signOut() {
+  if (confirm('Vuoi uscire dall\'account?')) auth.signOut();
+}
+
+// ── DATABASE HELPERS ──────────────────────────────────────────
+function userRef(path) {
+  return db.ref(`users/${currentUser.uid}/${path}`);
+}
+
+function setSyncState(state) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  if (state === 'syncing') { dot.className = 'sync-dot syncing'; lbl.textContent = 'Salvataggio...'; }
+  else if (state === 'ok')  { dot.className = 'sync-dot'; lbl.textContent = 'Sincronizzato'; }
+  else                       { dot.className = 'sync-dot error'; lbl.textContent = 'Errore sync'; }
+}
+
+// ── DATE ──────────────────────────────────────────────────────
+function todayKey() {
+  return new Date().toISOString().split('T')[0];
+}
+function formatDate(key) {
+  const [y,m,d] = key.split('-');
+  const date = new Date(y, m-1, d);
+  const days   = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+  const months = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+  return `${days[date.getDay()]} ${d} ${months[date.getMonth()]} ${y}`;
+}
+function updateHeaderDate() {
+  const now = new Date();
+  const days   = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  const months = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+  document.getElementById('headerDate').innerHTML =
+    `<strong>${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}</strong>`;
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'storico') renderHistory();
+  if (name === 'stats')   renderStats();
+}
+
+// ── FORM STATE ────────────────────────────────────────────────
+let activities = [];
+let objectives = [];
+
+function addActivity(client='', desc='', ore='') {
+  activities.push({ id: Date.now() + Math.random(), client, desc, ore });
+  renderActivities();
+}
+function removeActivity(id) {
+  activities = activities.filter(a => a.id !== id);
+  renderActivities();
+}
+function renderActivities() {
+  document.getElementById('activityList').innerHTML = activities.map(a => `
+    <div class="activity-row">
+      <div class="activity-row-inner">
+        <div class="activity-fields">
+          <input type="text" placeholder="Cliente / Progetto" value="${esc(a.client)}"
+            oninput="upd(${a.id},'client',this.value)">
+          <div class="activity-inline">
+            <input type="text" placeholder="Descrizione attività" value="${esc(a.desc)}"
+              oninput="upd(${a.id},'desc',this.value)">
+            <input type="number" placeholder="Ore" value="${a.ore}" min="0" max="24" step="0.5"
+              oninput="upd(${a.id},'ore',this.value);updateTotal()">
+          </div>
+        </div>
+        <button class="btn-remove" onclick="removeActivity(${a.id})">×</button>
+      </div>
+    </div>`).join('');
+  updateTotal();
+}
+function upd(id, field, value) {
+  const a = activities.find(x => x.id === id);
+  if (a) a[field] = value;
+}
+function updateTotal() {
+  const t = activities.reduce((s,a) => s + (parseFloat(a.ore)||0), 0);
+  document.getElementById('totalOre').textContent = fmtH(t);
+}
+
+function addObjective(text='') {
+  objectives.push({ id: Date.now() + Math.random(), text });
+  renderObjectives();
+}
+function removeObjective(id) {
+  objectives = objectives.filter(o => o.id !== id);
+  renderObjectives();
+}
+function renderObjectives() {
+  document.getElementById('objList').innerHTML = objectives.map(o => `
+    <div class="obj-row">
+      <input type="text" placeholder="Es: Completare proposta cliente X" value="${esc(o.text)}"
+        oninput="updObj(${o.id},this.value)">
+      <button class="btn-remove" onclick="removeObjective(${o.id})">×</button>
+    </div>`).join('');
+}
+function updObj(id, value) {
+  const o = objectives.find(x => x.id === id);
+  if (o) o.text = value;
+}
+
+// ── LOAD TODAY ────────────────────────────────────────────────
+function loadToday() {
+  activities = []; objectives = [];
+  document.getElementById('todaySavedBanner').style.display = 'none';
+  document.getElementById('noteText').value = '';
+  renderActivities(); renderObjectives();
+
+  userRef(`reports/${todayKey()}`).once('value').then(snap => {
+    const r = snap.val();
+    if (r) {
+      document.getElementById('todaySavedBanner').style.display = 'flex';
+      (r.activities || []).forEach(a =>
+        activities.push({ id: Date.now() + Math.random(), ...a }));
+      document.getElementById('noteText').value = r.notes || '';
+      (r.objectives || []).forEach(o =>
+        objectives.push({ id: Date.now() + Math.random(), text: o }));
+    } else {
+      addActivity(); addObjective();
+    }
+    renderActivities(); renderObjectives();
+  });
+}
+
+// ── SAVE REPORT ───────────────────────────────────────────────
+function saveReport() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  setSyncState('syncing');
+
+  const report = {
+    date: todayKey(),
+    activities: activities.map(a => ({
+      client: a.client.trim(), desc: a.desc.trim(), ore: parseFloat(a.ore)||0
+    })).filter(a => a.client || a.desc),
+    notes: document.getElementById('noteText').value.trim(),
+    objectives: objectives.map(o => o.text.trim()).filter(Boolean),
+    savedAt: new Date().toISOString()
+  };
+
+  userRef(`reports/${todayKey()}`).set(report)
+    .then(() => {
+      setSyncState('ok');
+      document.getElementById('todaySavedBanner').style.display = 'flex';
+      showToast('✓ Report salvato e sincronizzato!');
+    })
+    .catch(err => {
+      setSyncState('error');
+      showToast('⚠ Errore: ' + err.message);
+    })
+    .finally(() => { btn.disabled = false; });
+}
+
+// ── HISTORY ───────────────────────────────────────────────────
+let allReports = {};
+
+function renderHistory() {
+  const container = document.getElementById('historyContainer');
+  const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+
+  container.innerHTML = `<div class="loading-spinner">⏳ Caricamento...</div>`;
+
+  userRef('reports').once('value').then(snap => {
+    allReports = snap.val() || {};
+    let keys = Object.keys(allReports).sort().reverse();
+
+    if (q) {
+      keys = keys.filter(k => {
+        const r = allReports[k];
+        return formatDate(k).toLowerCase().includes(q) ||
+          (r.activities||[]).some(a => (a.client||'').toLowerCase().includes(q) || (a.desc||'').toLowerCase().includes(q)) ||
+          (r.notes||'').toLowerCase().includes(q);
+      });
+    }
+
+    if (!keys.length) {
+      container.innerHTML = `<div class="history-empty"><span class="emoji">${q?'🔍':'📭'}</span>${q ? 'Nessun risultato per "'+esc(q)+'"' : 'Nessun report.<br>Inizia oggi!'}</div>`;
+      return;
+    }
+
+    container.innerHTML = keys.map(k => {
+      const r = allReports[k];
+      const totalOre = (r.activities||[]).reduce((s,a) => s+(a.ore||0), 0);
+      const nAct = (r.activities||[]).filter(a => a.client||a.desc).length;
+      return `
+        <div class="report-card" onclick="toggleReport(this)">
+          <div class="report-card-header">
+            <div>
+              <div class="report-date">${formatDate(k)}</div>
+              <div class="report-meta">
+                ${nAct>0 ? `<span class="badge tasks">📌 ${nAct} attività</span>` : ''}
+                ${totalOre>0 ? `<span class="badge hours">⏱ ${fmtH(totalOre)}</span>` : ''}
+              </div>
+            </div>
+            <span class="chevron">▼</span>
+          </div>
+          <div class="report-body">
+            ${(r.activities||[]).filter(a=>a.client||a.desc).length>0 ? `
+              <div class="report-section">
+                <div class="report-section-label">Attività</div>
+                ${(r.activities||[]).filter(a=>a.client||a.desc).map(a=>`
+                  <div class="activity-item">
+                    <div class="activity-item-main">
+                      ${a.client?`<div class="activity-item-client">${esc(a.client)}</div>`:''}
+                      ${a.desc?`<div class="activity-item-desc">${esc(a.desc)}</div>`:''}
+                    </div>
+                    ${a.ore?`<div class="activity-item-hours">${fmtH(a.ore)}</div>`:''}
+                  </div>`).join('')}
+              </div>` : ''}
+            ${r.notes ? `
+              <div class="report-section">
+                <div class="report-section-label">Note</div>
+                <div class="note-text">${esc(r.notes)}</div>
+              </div>` : ''}
+            ${(r.objectives||[]).length>0 ? `
+              <div class="report-section">
+                <div class="report-section-label">Obiettivi per il giorno dopo</div>
+                ${r.objectives.map(o=>`<div class="obj-item"><span class="obj-bullet">→</span> ${esc(o)}</div>`).join('')}
+              </div>` : ''}
+            <button class="btn btn-secondary" style="margin-top:10px;font-size:12px;padding:7px 12px"
+              onclick="deleteReport('${k}',event)">🗑 Elimina</button>
+          </div>
+        </div>`;
+    }).join('');
+  });
+}
+
+function toggleReport(el) { el.classList.toggle('expanded'); }
+
+function deleteReport(key, e) {
+  e.stopPropagation();
+  if (!confirm('Eliminare il report del ' + formatDate(key) + '?')) return;
+  userRef(`reports/${key}`).remove().then(() => {
+    if (key === todayKey()) {
+      document.getElementById('todaySavedBanner').style.display = 'none';
+      loadToday();
+    }
+    renderHistory();
+    showToast('🗑 Report eliminato');
+  });
+}
+
+// ── STATISTICS ────────────────────────────────────────────────
+function renderStats() {
+  userRef('reports').once('value').then(snap => {
+    const data = snap.val() || {};
+    const keys = Object.keys(data);
+    const all  = keys.map(k => data[k]);
+
+    const totalDays = keys.length;
+    const totalOre  = all.reduce((s,r) => s+(r.activities||[]).reduce((ss,a)=>ss+(a.ore||0),0), 0);
+    const totalActs = all.reduce((s,r) => s+(r.activities||[]).filter(a=>a.client||a.desc).length, 0);
+    const avgOre    = totalDays>0 ? totalOre/totalDays : 0;
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card"><div class="stat-value">${totalDays}</div><div class="stat-label">Report totali</div></div>
+      <div class="stat-card"><div class="stat-value">${fmtH(totalOre)}</div><div class="stat-label">Ore registrate</div></div>
+      <div class="stat-card"><div class="stat-value">${fmtH(avgOre)}</div><div class="stat-label">Media giornaliera</div></div>
+      <div class="stat-card"><div class="stat-value">${totalActs}</div><div class="stat-label">Attività totali</div></div>`;
+
+    // Last 7 days
+    const maxH = 10;
+    const dayLabels = ['D','L','M','M','G','V','S'];
+    const bars = [];
+    for (let i=6; i>=0; i--) {
+      const d = new Date(); d.setDate(d.getDate()-i);
+      const k = d.toISOString().split('T')[0];
+      const r = data[k];
+      const ore = r ? (r.activities||[]).reduce((s,a)=>s+(a.ore||0),0) : 0;
+      bars.push(`
+        <div class="week-bar-row">
+          <div class="week-bar-label">${dayLabels[d.getDay()]}</div>
+          <div class="week-bar-track"><div class="week-bar-fill" style="width:${Math.min(100,(ore/maxH)*100)}%"></div></div>
+          <div class="week-bar-val">${ore>0?fmtH(ore):'–'}</div>
+        </div>`);
+    }
+    document.getElementById('weekBars').innerHTML = bars.join('');
+
+    // Client stats
+    const cm = {};
+    all.forEach(r => (r.activities||[]).forEach(a => {
+      if (!a.client) return;
+      cm[a.client] = (cm[a.client]||0) + (a.ore||0);
+    }));
+    const clients = Object.entries(cm).sort((a,b)=>b[1]-a[1]);
+    const maxC = clients[0]?.[1]||1;
+    document.getElementById('clientStats').innerHTML = !clients.length
+      ? '<div style="color:var(--text-dim);font-size:13px;text-align:center;padding:14px">Nessun dato ancora</div>'
+      : clients.map(([name,ore]) => `
+          <div class="week-bar-row" style="margin-bottom:9px">
+            <div style="width:110px;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(name)}">${esc(name)}</div>
+            <div class="week-bar-track"><div class="week-bar-fill" style="width:${(ore/maxC)*100}%;background:var(--accent2)"></div></div>
+            <div class="week-bar-val">${fmtH(ore)}</div>
+          </div>`).join('');
+  });
+}
+
+// ── UTILS ─────────────────────────────────────────────────────
+function fmtH(h) { return h % 1 === 0 ? h+'h' : Number(h).toFixed(1)+'h'; }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
